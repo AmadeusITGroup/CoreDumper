@@ -6,6 +6,9 @@
 AC_PREREQ(2.57)
 
 AC_INIT(coredumper, 1.2.1, opensource@google.com)
+
+AC_CONFIG_MACRO_DIR([m4])
+
 # The argument here is just something that should be in the current directory
 # (for sanity checking)
 AC_CONFIG_SRCDIR(README)
