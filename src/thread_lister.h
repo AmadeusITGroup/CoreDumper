@@ -53,8 +53,8 @@ typedef int (*ListAllProcessThreadsCallBack)(void *parameter,
  * The callback is executed from a separate thread which shares only the
  * address space, the filesystem, and the filehandles with the caller. Most
  * notably, it does not share the same pid and ppid; and if it terminates,
- * the rest of the application is still there. 'callback' is supposed to do
- * or arrange for ResumeAllProcessThreads. This happens automatically, if
+ * the rest of the application is still there. 'callback' is not supposed to
+ * do or arrange for ResumeAllProcessThreads. This happens automatically, if
  * the thread raises a synchronous signal (e.g. SIGSEGV); asynchronous
  * signals are blocked. If the 'callback' decides to unblock them, it must
  * ensure that they cannot terminate the application, or that
@@ -64,16 +64,25 @@ typedef int (*ListAllProcessThreadsCallBack)(void *parameter,
  * avoid going through libc. Also, this means that it is not legal to call
  * exit() or abort().
  * We return -1 on error and the return value of 'callback' on success.
+ * This function must be called only with the global lock taken.
  */
-int ListAllProcessThreads(void *parameter,
-                          ListAllProcessThreadsCallBack callback, ...);
+int ListAllProcessThreadsLocked(void *parameter,
+                          ListAllProcessThreadsCallBack callback, va_list arguments);
 
 /* This function resumes the list of all linux threads that
  * ListAllProcessThreads pauses before giving to its callback.
  * The function returns non-zero if at least one thread was
  * suspended and has now been resumed.
+ * This function must be called only with the global lock taken.
  */
 int ResumeAllProcessThreads(int num_threads, pid_t *thread_pids);
+
+void LockGlobalMutex();
+
+void UnlockGlobalMutex();
+
+/* Unlocked version that take the lock, then call the locked version. */
+int ListAllProcessThreads(void *parameter, ListAllProcessThreadsCallBack callback, ...);
 
 #ifdef __cplusplus
 }

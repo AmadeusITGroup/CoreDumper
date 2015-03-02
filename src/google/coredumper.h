@@ -141,9 +141,11 @@ extern const struct CoredumperCompressor COREDUMPER_UNCOMPRESSED[];
  *
  * The current implementation tries very hard to behave reasonably when
  * called from a signal handler, but no guarantees are made that this will
- * always work. Most importantly, it is the caller's responsibility to
- * make sure that there are never more than one instance of GetCoreDump()
- * or WriteCoreDump() executing concurrently.
+ * always work. The library will take care of handling concurrency between
+ * threads, so it is safe to call GetCoreDump, WriteCoreDump or
+ * Coredumper_PutCorePointAt concurrently. Note that a poor spinlock mechanism
+ * is implemented for synchronization, so you will burn CPUs while waiting.
+ * Better avoid concurrent dump.
  */
 int GetCoreDump(void);
 
@@ -194,6 +196,43 @@ int WriteCompressedCoreDump(const char *file_name, size_t max_length,
                             const struct CoredumperCompressor compressors[],
                             struct CoredumperCompressor **selected_compressor);
 
+/*
+ * Put a core point replacing the instruction at address iAddress. The core point will dump a core
+ * only once, then we will be removed. Note that the caller *MUST* ensure that iFileName and
+ * iParameters are always valid over time, until the core point has been reached. These values won't
+ * be copied. The caller can regularly check that a given core point is set with IsCorePointSet() or
+ * GetListOfCorePoints().
+ *
+ * Returns 1 on success.
+ * Returns 0 if the core point was already set.
+ * Returns -1 on error.
+ */
+int Coredumper_PutCorePointAt(void* iAddress, const char* iFileName, const struct CoreDumpParameters* iParameters);
+
+/*
+ * Returns 1 on success.
+ * Returns 0 if no core point was set at this address.
+ * Returns -1 on error.
+ */
+int Coredumper_DeleteCorePointAt(void* iAddress);
+
+/*
+ * Return 1 if the core point is still set, 0 otherwise.
+ */
+int Coredumper_IsCorePointSet(void* iAddress);
+
+/*
+ * Fills iAddressList with the list of core point still set.
+ * It always returns the total number of core point still set. If the list is not big
+ * enough to gather them all, only the firsts are given. Note that the order of the element
+ * in the list between two calls is not guaranteed to be the same.
+ */
+size_t Coredumper_GetListOfCorePoints(size_t iAddressListLength, void** iAddressList);
+
+/*
+ * Return the number of core points still set.
+ */
+size_t Coredumper_GetCorePointsCount();
 
 /* A convenience definition to clear core dump parameters.
  */

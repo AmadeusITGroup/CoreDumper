@@ -46,6 +46,8 @@ extern "C" {
 #include <stdarg.h>
 #include <stdint.h>
 #include <sys/types.h>
+#include <ucontext.h>
+#include <stdbool.h>
 #include "config.h"
 
 #ifdef __aarch64__
@@ -91,6 +93,47 @@ extern "C" {
     uint16_t  ss, __ss;
   #endif
   } i386_regs;
+
+  #if defined(__x86_64__)
+    /*
+     * x86_64 sigcontext structure, imported from
+     * arch/x86/include/asm/sigcontext.h
+     * We hardcode a version here since the glibc definition
+     * slightly differs from the kernel one, so make sure of which
+     * version we use.
+     */
+    struct kernel_fpstate; /* Only forward declared. */
+    struct kernel_sigcontext {
+      unsigned long r8;
+      unsigned long r9;
+      unsigned long r10;
+      unsigned long r11;
+      unsigned long r12;
+      unsigned long r13;
+      unsigned long r14;
+      unsigned long r15;
+      unsigned long rdi;
+      unsigned long rsi;
+      unsigned long rbp;
+      unsigned long rbx;
+      unsigned long rdx;
+      unsigned long rax;
+      unsigned long rcx;
+      unsigned long rsp;
+      unsigned long rip;
+      unsigned long eflags;
+      unsigned short cs;
+      unsigned short gs;
+      unsigned short fs;
+      unsigned short __pad0;
+      unsigned long err;
+      unsigned long trapno;
+      unsigned long oldmask;
+      unsigned long cr2;
+      struct kernel_fpstate *fpstate;
+      unsigned long reserved1[8];
+    };
+  #endif
 #elif defined(__ARM_ARCH_3__)
   typedef struct arm_regs {     /* General purpose registers                 */
     #define BP uregs[11]        /* Frame pointer                             */
@@ -183,7 +226,7 @@ extern "C" {
     int              errno_;
     pid_t            tid;
   } Frame;
-  #define FRAME(f) Frame f;                                           \
+  #define FILL_FRAME_FROM_CURRENT_REGISTERS(f)                        \
                    do {                                               \
                      f.errno_ = errno;                                \
                      f.tid    = sys_gettid();                         \
@@ -232,6 +275,46 @@ extern "C" {
                      "1:"                                             \
                        : : "a" (&f) : "memory");                      \
                      } while (0)
+
+  #define FRAME(f) \
+    Frame f; \
+    FILL_FRAME_FROM_CURRENT_REGISTERS(f)
+
+  #define FRAME_FROM_SIGNAL_HANDLER_SAVED_CONTEXT_IS_EXACT true
+
+  #define FRAME_FROM_SIGNAL_HANDLER_SAVED_CONTEXT(f, ucontext_void_ptr) \
+    Frame f; \
+    /* Fill frame from the current register, to fill in what is not in
+     * ucontext. */ \
+    FILL_FRAME_FROM_CURRENT_REGISTERS(f); \
+    do { \
+      f.errno_ = errno; \
+      f.tid    = sys_gettid(); \
+      struct ucontext_t* ucontext = (struct ucontext_t*)(ucontext_void_ptr); \
+      struct kernel_sigcontext* sigcontext = (struct kernel_sigcontext*)&ucontext->uc_mcontext; \
+      f.uregs.r8 = sigcontext->r8; \
+      f.uregs.r9 = sigcontext->r9; \
+      f.uregs.r10 = sigcontext->r10; \
+      f.uregs.r11 = sigcontext->r11; \
+      f.uregs.r12 = sigcontext->r12; \
+      f.uregs.r13 = sigcontext->r13; \
+      f.uregs.r14 = sigcontext->r14; \
+      f.uregs.r15 = sigcontext->r15; \
+      f.uregs.rdi = sigcontext->rdi; \
+      f.uregs.rsi = sigcontext->rsi; \
+      f.uregs.rbp = sigcontext->rbp; \
+      f.uregs.rbx = sigcontext->rbx; \
+      f.uregs.rdx = sigcontext->rdx; \
+      f.uregs.rax = sigcontext->rax; \
+      f.uregs.rcx = sigcontext->rcx; \
+      f.uregs.rsp = sigcontext->rsp; \
+      f.uregs.rip = sigcontext->rip; \
+      f.uregs.eflags = sigcontext->eflags; \
+      f.uregs.cs = sigcontext->cs; \
+      f.uregs.gs = sigcontext->gs; \
+      f.uregs.fs = sigcontext->fs; \
+    } while (0)
+
   #define SET_FRAME(f,r)                                              \
                      do {                                             \
                        errno = (f).errno_;                            \
@@ -365,6 +448,14 @@ extern "C" {
   } Frame;
   #define FRAME(f) Frame f; do { f.tid = sys_gettid(); } while (0)
   #define SET_FRAME(f,r) do { } while (0)
+#endif
+
+#ifndef FRAME_FROM_SIGNAL_HANDLER_SAVED_CONTEXT
+  /* If no arch specific implementation is g given to retrieve a frame from
+   * a signal handler saved context, then we fallback to the normal frame
+   * collection, which is not the exact one. */
+  #define FRAME_FROM_SIGNAL_HANDLER_SAVED_CONTEXT_IS_EXACT false
+  #define FRAME_FROM_SIGNAL_HANDLER_SAVED_CONTEXT(f) FRAME(f)
 #endif
 
 
