@@ -65,12 +65,13 @@ uninstall-hook:
 lib_LTLIBRARIES += libcoredumper.la
 LIBCOREDUMPER_INCLUDES = src/google/coredumper.h src/elfcore.h \
                          src/linux_syscall_support.h src/linuxthreads.h \
-                         src/thread_lister.h
+                         src/thread_lister.h src/corepoint.h
 googleinclude_HEADERS += src/google/coredumper.h
 libcoredumper_la_SOURCES = src/coredumper.c \
                            src/thread_lister.c \
                            src/elfcore.c \
                            src/linuxthreads.c \
+                           src/corepoint.c \
                            $(LIBCOREDUMPER_INCLUDES)
 libcoredumper_la_LDFLAGS = -export-symbols $(top_srcdir)/src/libcoredumper.sym \
                            -version-info 1:0:0

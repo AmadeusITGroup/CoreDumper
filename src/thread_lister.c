@@ -37,6 +37,7 @@
 #include <unistd.h>
 #include "thread_lister.h"
 #include "linuxthreads.h"
+#include "src/google/coredumper.h"
 /* Include other thread listers here that define THREADS macro
  * only when they can provide a good implementation.
  */
@@ -47,18 +48,15 @@
  * or if the multi-threading code has not been ported, yet.
  */
 
-int ListAllProcessThreads(void *parameter,
-                          ListAllProcessThreadsCallBack callback, ...) {
+int ListAllProcessThreadsLocked(void *parameter,
+                          ListAllProcessThreadsCallBack callback, va_list arguments) {
   int rc;
-  va_list ap;
 
   int dumpable = prctl(PR_GET_DUMPABLE, 0);
   if (!dumpable)
     prctl(PR_SET_DUMPABLE, 1);
-  va_start(ap, callback);
   pid_t pid = getpid();
-  rc = callback(parameter, 1, &pid, ap);
-  va_end(ap);
+  rc = callback(parameter, 1, &pid, arguments);
   if (!dumpable)
     prctl(PR_SET_DUMPABLE, 0);
   return rc;
@@ -68,4 +66,23 @@ int ResumeAllProcessThreads(int num_threads, pid_t *thread_pids) {
   return 1;
 }
 
+/* No-op in non-multithreaded applications */
+void LockGlobalMutex() {}
+
+void UnlockGlobalMutex() {}
+
 #endif
+
+int ListAllProcessThreads(void *parameter, ListAllProcessThreadsCallBack callback, ...)
+{
+    va_list aArguments;
+    va_start(aArguments, callback);
+
+    LockGlobalMutex();
+    int aReturnValue = ListAllProcessThreadsLocked(parameter, callback, aArguments);
+    UnlockGlobalMutex();
+
+    va_end(aArguments);
+
+    return aReturnValue;
+}
