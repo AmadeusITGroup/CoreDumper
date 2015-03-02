@@ -57,6 +57,7 @@ extern "C" {
 #define CLONE_UNTRACED 0x00800000
 #endif
 
+static volatile char _globalLock = 0;
 
 /* Synchronous signals that should not be blocked while in the lister thread.
  */
@@ -493,12 +494,7 @@ static void ListerThread(struct ListerParams *args) {
                                       pids, args->ap);
         args->err = errno;
 
-        /* Callback should have resumed threads, but better safe than sorry  */
-        if (ResumeAllProcessThreads(num_threads, pids)) {
-          /* Callback forgot to resume at least one thread, report error     */
-          args->err    = EINVAL;
-          args->result = -1;
-        }
+        ResumeAllProcessThreads(num_threads, pids);
 
         sys__exit(0);
       }
@@ -532,16 +528,17 @@ static void ListerThread(struct ListerParams *args) {
  * avoid going through libc. Also, this means that it is not legal to call
  * exit() or abort().
  * We return -1 on error and the return value of 'callback' on success.
+ * This function must be called only with the global lock taken.
  */
-int ListAllProcessThreads(void *parameter,
-                          ListAllProcessThreadsCallBack callback, ...) {
+int ListAllProcessThreadsLocked(void *parameter,
+                          ListAllProcessThreadsCallBack callback, va_list arguments) {
   char                   altstack_mem[ALT_STACKSIZE];
   struct ListerParams    args;
   pid_t                  clone_pid;
   int                    dumpable = 1, sig;
   struct kernel_sigset_t sig_blocked, sig_old;
 
-  va_start(args.ap, callback);
+  va_copy(args.ap, arguments);
 
   /* If we are short on virtual memory, initializing the alternate stack
    * might trigger a SIGSEGV. Let's do this early, before it could get us
@@ -644,8 +641,6 @@ failed:
   if (!dumpable)
     sys_prctl(PR_SET_DUMPABLE, dumpable);
 
-  va_end(args.ap);
-
   errno = args.err;
   return args.result;
 }
@@ -654,6 +649,7 @@ failed:
  * ListAllProcessThreads pauses before giving to its callback.
  * The function returns non-zero if at least one thread was
  * suspended and has now been resumed.
+ * This function must be called only with the global lock taken.
  */
 int ResumeAllProcessThreads(int num_threads, pid_t *thread_pids) {
   int detached_at_least_one = 0;
@@ -661,6 +657,28 @@ int ResumeAllProcessThreads(int num_threads, pid_t *thread_pids) {
     detached_at_least_one |= sys_ptrace_detach(thread_pids[num_threads]) >= 0;
   }
   return detached_at_least_one;
+}
+
+/*
+ * Basic spinlocking implementation
+ */
+void LockGlobalMutex()
+{
+    /*
+     * Should be OK for all arch if gcc implements it correctly everywhere.
+     */
+    while (__sync_lock_test_and_set(&_globalLock, 1))
+    {
+        while (_globalLock) {}
+    }
+
+    /* Make sure that the values we read are the actual ones. */
+    __sync_synchronize();
+}
+
+void UnlockGlobalMutex()
+{
+    __sync_lock_release(&_globalLock);
 }
 
 #ifdef __cplusplus

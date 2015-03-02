@@ -1615,7 +1615,7 @@ static inline int GetParentRegs(void *frame, regs *cpu, fpregs *fp,
 
 /* Internal function for generating a core file. This function works for
  * both single- and multi-threaded core files. It assumes that all threads
- * are already suspended, and will resume them before returning.
+ * are already suspended.
  *
  * The caller must make sure that prctl(PR_SET_DUMPABLE, 1) has been called,
  * or this function might fail.
@@ -1667,7 +1667,6 @@ int InternalGetCoreDump(void *frame, int num_threads, pid_t *pids,
       if (map[j] >= 0 &&
           sys_ptrace(PTRACE_PEEKUSER, pids[i], (void *)map[j],
                      (unsigned long *)(thread_regs + i) + j)) {
-        ResumeAllProcessThreads(threads, pids);
         goto error;
       }
     }
@@ -1680,7 +1679,6 @@ int InternalGetCoreDump(void *frame, int num_threads, pid_t *pids,
     for (j = 0; j < 32; j++) {
       if (sys_ptrace(PTRACE_PEEKUSER, pids[i], (void *)(32 + j),
                      (uint64_t *)(thread_fpregs + i) + j)) {
-        ResumeAllProcessThreads(threads, pids);
         goto error;
       }
     }
@@ -1731,7 +1729,6 @@ int InternalGetCoreDump(void *frame, int num_threads, pid_t *pids,
       }
     } else {
    ptrace: /* Oh, well, undo everything and get out of here                  */
-      ResumeAllProcessThreads(threads, pids);
       goto error;
     }
     #endif
@@ -2158,7 +2155,6 @@ int InternalGetCoreDump(void *frame, int num_threads, pid_t *pids,
     }
   }
 
-  ResumeAllProcessThreads(threads, pids);
   return fd;
 
 error:
@@ -2168,7 +2164,6 @@ error:
       NO_INTR(sys_close(fd));
     errno = saved_errno;
   }
-  ResumeAllProcessThreads(threads, pids);
   return -1;
 }
 

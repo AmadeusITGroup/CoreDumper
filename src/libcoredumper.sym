@@ -19,3 +19,8 @@ SetCoreDumpCompressed
 SetCoreDumpLimited
 SetCoreDumpLimitedByPriority
 SetCoreDumpNotes
+Coredumper_PutCorePointAt
+Coredumper_DeleteCorePointAt
+Coredumper_IsCorePointSet
+Coredumper_GetListOfCorePoints
+Coredumper_GetCorePointsCount
