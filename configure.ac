@@ -5,7 +5,7 @@
 # make sure we're interpreted by some minimal autoconf
 AC_PREREQ([2.71])
 
-AC_INIT([coredumper],[1.3.1],[opensource@google.com])
+AC_INIT([coredumper],[1.4.0])
 # The argument here is just something that should be in the current directory
 # (for sanity checking)
 AC_CONFIG_SRCDIR(README)
