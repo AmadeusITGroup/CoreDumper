@@ -39,6 +39,7 @@ extern "C" {
 #endif
 
 #include <asm/stat.h>
+#include <linux/sched.h>
 #include <sched.h>
 #include <signal.h>
 #include <stdlib.h>
