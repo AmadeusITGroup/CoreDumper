@@ -12,7 +12,7 @@ AC_CONFIG_MACRO_DIR([m4])
 # The argument here is just something that should be in the current directory
 # (for sanity checking)
 AC_CONFIG_SRCDIR(README)
-AM_INIT_AUTOMAKE
+AM_INIT_AUTOMAKE([subdir-objects])
 AM_CONFIG_HEADER(src/config.h)
 
 # Checks for programs.
