@@ -5,7 +5,7 @@
 # make sure we're interpreted by some minimal autoconf
 AC_PREREQ(2.57)
 
-AC_INIT(coredumper, 1.3.1)
+AC_INIT(coredumper, 1.3.2)
 
 AC_CONFIG_MACRO_DIR([m4])
 
