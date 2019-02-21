@@ -228,7 +228,7 @@ static void trapSignalHandler(int iSignal, siginfo_t* iSignalInfo __attribute__(
     /* Prevent gcc from optimizing out the context pointer with "volatile", so that we can
      * easily access it in the generated core dump for analyzing the real context (ie registers)
      * at the moment the core point was reached. */
-    volatile struct ucontext* aContext = (struct ucontext*)ioVoidContext;
+    volatile struct ucontext_t* aContext = (struct ucontext_t*)ioVoidContext;
     volatile struct kernel_sigcontext* aReturnRegisters = (struct kernel_sigcontext*)&aContext->uc_mcontext;
 
     if (iSignal == SIGTRAP)

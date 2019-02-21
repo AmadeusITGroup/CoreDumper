@@ -280,7 +280,7 @@ extern "C" {
     do { \
       f.errno_ = errno; \
       f.tid    = sys_gettid(); \
-      struct ucontext* ucontext = (struct ucontext*)(ucontext_void_ptr); \
+      struct ucontext_t* ucontext = (struct ucontext_t*)(ucontext_void_ptr); \
       struct kernel_sigcontext* sigcontext = (struct kernel_sigcontext*)&ucontext->uc_mcontext; \
       f.uregs.r8 = sigcontext->r8; \
       f.uregs.r9 = sigcontext->r9; \
