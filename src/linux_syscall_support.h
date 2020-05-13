@@ -1452,10 +1452,11 @@ struct kernel_statfs {
 
                              /* Set up alignment of the child stack:
                               * child_stack &= ~ 0xF;
-                              * The compiler may rely on RSP being aligned to 10h bytes
-                              * before any call to a compiled function.
+                              * The compiler may rely on RSP being aligned to
+                              * 10h bytes before any call to a compiled
+                              * function.
                               */
-                             "andb  $-16, %5\n"
+                             "and    $-16, %5\n"
 
                              /* childstack -= 2*sizeof(void *);
                               */
