@@ -3,6 +3,8 @@
 # This is so we can #include <google/foo>
 AM_CPPFLAGS = -I$(top_srcdir)/src
 
+ACLOCAL_AMFLAGS = -I m4
+
 googleincludedir = $(includedir)/google
 ## The .h files you want to install (that is, .h files that people
 ## who install this package can include in their own applications.)

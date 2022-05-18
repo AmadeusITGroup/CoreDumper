@@ -3,14 +3,16 @@
 ##    % aclocal -I `pwd`/../autoconf && autoconf && autoheader && automake
 
 # make sure we're interpreted by some minimal autoconf
-AC_PREREQ(2.57)
+AC_PREREQ([2.71])
 
-AC_INIT(coredumper, 1.3.1, opensource@google.com)
+AC_INIT([coredumper],[1.3.1],[opensource@google.com])
 # The argument here is just something that should be in the current directory
 # (for sanity checking)
 AC_CONFIG_SRCDIR(README)
+
 AM_INIT_AUTOMAKE([subdir-objects])
-AM_CONFIG_HEADER(src/config.h)
+AC_CONFIG_MACRO_DIRS([m4])
+AC_CONFIG_HEADERS([src/config.h])
 
 # Checks for programs.
 AC_PROG_CC
@@ -19,13 +21,9 @@ AC_PROG_CC
 AC_PROG_CXX
 AC_PROG_INSTALL
 
-AC_PROG_LIBTOOL
+LT_INIT
 AC_SUBST(LIBTOOL_DEPS)
 
-# Check whether some low-level functions/files are available
-AC_HEADER_STDC
-
-# Here are some examples of how to check for the existence of a fn or file
 AC_CHECK_HEADERS([elf.h errno.h fcntl.h linux/unistd.h pthread.h signal.h     \
                   stdlib.h string.h sys/prctl.h sys/ptrace.h sys/resource.h   \
                   sys/socket.h sys/stat.h sys/sysctl.h sys/time.h sys/types.h \

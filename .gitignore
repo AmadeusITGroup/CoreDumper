@@ -19,6 +19,7 @@ TAGS
 Makefile
 config.h
 config.status
+libtool
 stamp-*
 .dirstamp
 .deps/
