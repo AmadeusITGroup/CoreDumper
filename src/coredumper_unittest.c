@@ -141,28 +141,29 @@ static void *Busy(void *arg) {
 static void CheckWithReadElf(FILE *input, FILE *output, const char *filename,
                              const char *suffix, const char *decompress,
                              const char *args) {
-  static const char *msg[] = { " ELF",
+  static const char *msg[] = {
+      " ELF",
 #if __BYTE_ORDER == __LITTLE_ENDIAN
-                               "little"
+      "little"
 #else
-                               "big"
+      "big"
 #endif
-                               " endian", "UNIX - System V",
-                               "Core file", "no sections in this file",
-                               "NOTE",
-                               "no relocations in this file",
-                               "The decoding of unwind sections for machine type Advanced Micro Devices X86-64 is not currently supported.",
-                               "No version information found in this file",
-                               "NT_PRPSINFO",
+      " endian", "UNIX - System V",
+      "Core file",
+      "There are no section", /* Different readelf versions show different text */
+
+      "NOTE",
+      "No version information found in this file",
+      "NT_PRPSINFO",
 #ifndef __mips__
-                               "NT_TASKSTRUCT",
+      "NT_TASKSTRUCT",
 #endif
-                               "NT_PRSTATUS", "NT_FPREGSET",
+      "NT_PRSTATUS", "NT_FPREGSET",
 #ifdef THREADS
-                               "NT_PRSTATUS", "NT_FPREGSET",
-                               "NT_PRSTATUS", "NT_FPREGSET",
+      "NT_PRSTATUS", "NT_FPREGSET",
+      "NT_PRSTATUS", "NT_FPREGSET",
 #endif
-                               "DONE", 0 };
+      "DONE", 0 };
   const char  **ptr;
   char buffer[4096];
   /* Some of the tests explicitly limit core file size, resulting in a
