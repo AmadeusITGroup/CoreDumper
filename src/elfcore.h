@@ -41,13 +41,16 @@ extern "C" {
  * Porting to other related platforms should not be difficult.
  */
 #if (defined(__i386__) || defined(__x86_64__) || defined(__ARM_ARCH_3__) || \
-     defined(__mips__)) && defined(__linux)
+     defined(__mips__) || defined(__aarch64__)) && defined(__linux)
 
 #include <stdarg.h>
 #include <stdint.h>
 #include <sys/types.h>
 #include "config.h"
 
+#ifdef __aarch64__
+#include <ucontext.h>
+#endif
 
 /* Define the DUMPER symbol to make sure that there is exactly one
  * core dumper built into the library.
@@ -96,6 +99,13 @@ extern "C" {
     #define LR uregs[14]        /* Link register                             */
     long uregs[18];
   } arm_regs;
+#elif defined(__aarch64__)
+  typedef struct arm64_regs {     /* General purpose registers                 */
+    uint64_t    uregs[31];
+    uint64_t    sp;
+    uint64_t    pc;
+    uint64_t    pstate;
+  } arm64_regs;
 #elif defined(__mips__)
   typedef struct mips_regs {
     unsigned long pad[6];       /* Unused padding to match kernel structures */
@@ -262,6 +272,27 @@ extern "C" {
                        errno         = (f).errno_;                    \
                        (r)           = (f).arm;                       \
                        (r).uregs[16] = fps;                           \
+                     } while (0)
+#elif defined(__aarch64__) && defined(__GNUC__)
+  typedef struct Frame {
+    struct arm64_regs arm;
+    int               errno_;
+    pid_t             tid;
+  } Frame;
+  #define FRAME(f) Frame f;                             \
+                    do {                                \
+                        f.errno_ = errno;               \
+                        f.tid    = sys_gettid();        \
+                        ucontext_t context;             \
+                        getcontext(&context);           \
+                        memcpy((void*)&f.arm,                          \
+                               (const void*)&context.uc_mcontext.regs, \
+                               sizeof(arm64_regs));                    \
+                    } while (0)
+  #define SET_FRAME(f,r)                                \
+                     do {                               \
+                       errno         = (f).errno_;      \
+                       (r)           = (f).arm;         \
                      } while (0)
 #elif defined(__mips__) && defined(__GNUC__)
   typedef struct Frame {

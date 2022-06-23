@@ -48,6 +48,7 @@ extern "C" {
 #include <string.h>
 #include <sys/poll.h>
 #include <sys/prctl.h>
+#include <sys/procfs.h>
 #include <sys/socket.h>
 #include <sys/sysctl.h>
 #include <sys/time.h>
@@ -75,6 +76,8 @@ extern "C" {
     #define O_LARGEFILE 0400000
   #elif defined(__PPC__) || defined(__ppc__)
     #define O_LARGEFILE 0200000
+  #elif defined(__O_LARGEFILE)
+    #define O_LARGEFILE  __O_LARGEFILE
   #else
     #define O_LARGEFILE 00100000 /* generic                                  */
   #endif
@@ -141,6 +144,15 @@ extern "C" {
     unsigned int   init_flag;
   } fpregs;
   #define regs arm_regs         /* General purpose registers                 */
+#elif defined(__aarch64__)
+  typedef struct fpxregs {      /* No extended FPU registers on ARM          */
+  } fpxregs;
+  typedef struct fpregs {       /* FPU registers                             */
+    __uint128_t  vregs[32];
+    unsigned int fpsr;
+    unsigned int fpcr;
+  } fpregs;
+  #define regs arm64_regs         /* General purpose registers                 */
 #elif defined(__mips__)
   typedef struct fpxregs {      /* No extended FPU registers on MIPS         */
   } fpxregs;
@@ -157,13 +169,7 @@ typedef struct elf_timeval {    /* Time value with microsecond resolution    */
   long tv_usec;                 /* Microseconds                              */
 } elf_timeval;
 
-
-typedef struct elf_siginfo {    /* Information about signal (unused)         */
-  int32_t si_signo;             /* Signal number                             */
-  int32_t si_code;              /* Extra code                                */
-  int32_t si_errno;             /* Errno                                     */
-} elf_siginfo;
-
+typedef struct elf_siginfo elf_siginfo;
 
 typedef struct prstatus {       /* Information about thread; includes CPU reg*/
   elf_siginfo    pr_info;       /* Info associated with signal               */
@@ -232,6 +238,9 @@ typedef struct core_user {      /* Ptrace returns this data for thread state */
 #elif defined(__ARM_ARCH_3__)
   struct fpregs  fpregs;        /* FPU registers                             */
   struct fpregs  *fpregs_ptr;   /* Pointer to FPU registers                  */
+#elif defined(__aarch64__)
+  struct fpregs  fpregs;        /* FPU registers                             */
+  struct fpregs  *fpregs_ptr;   /* Pointer to FPU registers                  */
 #endif
 #endif
 } core_user;
@@ -260,6 +269,8 @@ typedef struct core_user {      /* Ptrace returns this data for thread state */
   #define ELF_ARCH  EM_386
 #elif defined(__ARM_ARCH_3__)
   #define ELF_ARCH  EM_ARM
+#elif defined(__aarch64__)
+  #define ELF_ARCH  EM_AARCH64
 #elif defined(__mips__)
   #define ELF_ARCH  EM_MIPS
 #endif
@@ -923,6 +934,23 @@ static int CreateElfCore(void *handle,
                       }
                     }
 
+                    #if defined(__aarch64__)
+                    /* check if the flag is "pf" (pure PFN range).
+                     * [vvar] is the only region that is marked as "pf" on arm64
+                     * x86_64: [vvar] region is marked as "pf" and "dd" (don't dump)
+                     * arm64:  [vvar] region is marked as "pf"
+                     * Reading data from [vvar] on arm64 fails with errno 14 (EFAULT)
+                     * Consider "pf" as a "don't dump" flag on arm64, similar of x86_64
+                     */
+                    if (ch == 'p') {
+                      ch = GetChar(&io);
+                      if (ch == 'f') {
+                        dontdump = true;
+                        break;
+                      }
+                    }
+                    #endif
+
                     /* skip any remaining flag characters */
                     while (ch >= 'a' && ch <= 'z')
                       ch = GetChar(&io);
@@ -1489,7 +1517,7 @@ static int CreatePipeline(int *fds, int openmax, const char *PATH,
 
   /* Find a suitable compressor program, if necessary                        */
   if (*compressors != NULL && (*compressors)->compressor != NULL) {
-    char stack[4096];
+    char stack[4096] __attribute__((aligned (16)));
     struct CreateArgs args;
     pid_t comp_pid;
 
@@ -1693,7 +1721,7 @@ int InternalGetCoreDump(void *frame, int num_threads, pid_t *pids,
 #ifdef THREADS
   for (i = 0; i < threads; i++) {
     char scratch[4096];
-    #ifdef __mips__
+    #if defined(__mips__)
     /* MIPS kernels do not support PTRACE_GETREGS, instead we have to call
      * PTRACE_PEEKUSER go retrieve individual CPU registers. The indices
      * for these registers do not exactly match with the order in the
@@ -1749,6 +1777,25 @@ int InternalGetCoreDump(void *frame, int num_threads, pid_t *pids,
     if (main_pid == pids[i]) {
       SET_FRAME(*(Frame *)frame, thread_regs[i]);
     }
+    hasSSE = 0;
+    #elif defined(__aarch64__)
+    memset(scratch, 0xFF, sizeof(scratch));
+    struct iovec scratch_iovec = { scratch, sizeof(scratch)};
+    if (sys_ptrace(PTRACE_GETREGSET, pids[i], (void*)NT_PRSTATUS, &scratch_iovec) < 0) {
+      ResumeAllProcessThreads(threads, pids);
+      goto error;
+    }
+    memcpy(thread_regs + i, scratch, sizeof(struct regs));
+    if (main_pid == pids[i]) {
+      SET_FRAME(*(Frame *)frame, thread_regs[i]);
+    }
+    memset(scratch, 0xFF, sizeof(scratch));
+    scratch_iovec.iov_len = sizeof(scratch);
+    if (sys_ptrace(PTRACE_GETREGSET, pids[i], (void*)NT_FPREGSET, &scratch_iovec) < 0) {
+      ResumeAllProcessThreads(threads, pids);
+      goto error;
+    }
+    memcpy(thread_fpregs + i, scratch, sizeof(struct fpregs));
     hasSSE = 0;
     #else
     memset(scratch, 0xFF, sizeof(scratch));
@@ -1806,7 +1853,8 @@ int InternalGetCoreDump(void *frame, int num_threads, pid_t *pids,
   prpsinfo.pr_gid   = sys_getegid();
   prpsinfo.pr_pid   = main_pid;
   prpsinfo.pr_ppid  = sys_getppid();
-  prpsinfo.pr_pgrp  = sys_getpgrp();
+  prpsinfo.pr_pgrp  = getpgrp();    // syscall sys_getpgrp() is obsolete on arm64-linux.
+                                    // replaced it with getpgrp() that works on X86_64 and arm64-linux.
   prpsinfo.pr_sid   = sys_getsid(0);
   /* scope */ {
     char scratch[4096], *cmd = scratch, *ptr;
@@ -1897,8 +1945,8 @@ int InternalGetCoreDump(void *frame, int num_threads, pid_t *pids,
   }
 
   /* scope */ {
-    int openmax  = sys_sysconf(_SC_OPEN_MAX);
-    int pagesize = sys_sysconf(_SC_PAGESIZE);
+    int openmax  = sysconf(_SC_OPEN_MAX);   // sys_sysconf() is not supported by the kernel
+    int pagesize = sysconf(_SC_PAGESIZE);   // and it is removed from the latest linux_syscall_support.h
     struct kernel_sigset_t old_signals, blocked_signals;
 
     const char *file_name =

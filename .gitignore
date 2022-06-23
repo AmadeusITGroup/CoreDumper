@@ -13,6 +13,7 @@ GSYMS
 GTAGS
 ID
 TAGS
+.vscode
 
 # Build / autotools artifacts
 /autom4te.cache/
@@ -31,3 +32,4 @@ core.*
 coredumper_unittest
 linux_syscall_support_unittest
 *.trs
+libtool

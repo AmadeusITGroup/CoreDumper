@@ -57,6 +57,7 @@ extern "C" {
 #define CLONE_UNTRACED 0x00800000
 #endif
 
+const size_t kSigsetSize = sizeof(struct kernel_sigset_t);
 
 /* Synchronous signals that should not be blocked while in the lister thread.
  */
@@ -113,7 +114,9 @@ static int local_clone (int (*fn)(void *), void *arg, ...) {
    * is being debugged. This is OK and the error code will be reported
    * correctly.
    */
-  return sys_clone(fn, (char *)&arg - 4096,
+  uintptr_t child_stack = ((uintptr_t)&arg - 4096);
+  child_stack += (16 - child_stack % 16);
+  return sys_clone(fn, (void *)child_stack,
                    CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_UNTRACED, arg, 0, 0, 0);
 }
 
@@ -316,9 +319,9 @@ static void ListerThread(struct ListerParams *args) {
     sa.sa_sigaction_ = SignalHandler;
     sys_sigfillset(&sa.sa_mask);
     sa.sa_flags      = SA_ONSTACK|SA_SIGINFO|SA_RESETHAND;
-    sys_sigaction(sync_signals[sig], &sa, (struct kernel_sigaction *)NULL);
+    sys_rt_sigaction(sync_signals[sig], &sa, (struct kernel_sigaction *)NULL, kSigsetSize);
   }
-  
+
   /* Read process directories in /proc/...                                   */
   for (;;) {
     /* Some kernels know about threads, and hide them in "/proc"
@@ -334,7 +337,7 @@ static void ListerThread(struct ListerParams *args) {
     }
     if (sys_fstat(proc, &proc_sb) < 0)
       goto failure;
-    
+
     /* Since we are suspending threads, we cannot call any libc
      * functions that might acquire locks. Most notably, we cannot
      * call malloc(). So, we have to allocate memory on the stack,
@@ -348,7 +351,7 @@ static void ListerThread(struct ListerParams *args) {
      */
     if (max_threads < proc_sb.st_nlink + 100)
       max_threads = proc_sb.st_nlink + 100;
-    
+
     /* scope */ {
       pid_t pids[max_threads];
       int   added_entries = 0;
@@ -380,11 +383,11 @@ static void ListerThread(struct ListerParams *args) {
           if (entry->d_ino != 0) {
             const char *ptr = entry->d_name;
             pid_t pid;
-            
+
             /* Some kernels hide threads by preceding the pid with a '.'     */
             if (*ptr == '.')
               ptr++;
-            
+
             /* If the directory is not numeric, it cannot be a
              * process/thread
              */
@@ -398,7 +401,7 @@ static void ListerThread(struct ListerParams *args) {
               char fname[entry->d_reclen + 48];
               strcat(strcat(strcpy(fname, "/proc/"),
                             entry->d_name), marker_path);
-              
+
               /* Check if the marker is identical to the one we created      */
               if (sys_stat(fname, &tmp_sb) >= 0 &&
                   marker_sb.st_ino == tmp_sb.st_ino) {
@@ -414,7 +417,7 @@ static void ListerThread(struct ListerParams *args) {
                     goto next_entry;
                   }
                 }
-                
+
                 /* Check whether data structure needs growing                */
                 if (num_threads >= max_threads) {
                   /* Back to square one, this time with more memory          */
@@ -446,7 +449,7 @@ static void ListerThread(struct ListerParams *args) {
                     goto next_entry;
                   }
                 }
-                
+
                 if (sys_ptrace(PTRACE_PEEKDATA, pid, &i, &j) || i++ != j ||
                     sys_ptrace(PTRACE_PEEKDATA, pid, &i, &j) || i   != j) {
                   /* Address spaces are distinct, even though both
@@ -559,9 +562,9 @@ int ListAllProcessThreads(void *parameter,
   /* Make this process "dumpable". This is necessary in order to ptrace()
    * after having called setuid().
    */
-  dumpable = sys_prctl(PR_GET_DUMPABLE, 0);
+  dumpable = sys_prctl(PR_GET_DUMPABLE, 0, 0, 0, 0);
   if (!dumpable)
-    sys_prctl(PR_SET_DUMPABLE, 1);
+    sys_prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
 
   /* Fill in argument block for dumper thread                                */
   args.result       = -1;
@@ -600,7 +603,7 @@ int ListAllProcessThreads(void *parameter,
       #undef  SYS_LINUX_SYSCALL_SUPPORT_H
       #include "linux_syscall_support.h"
     #endif
-  
+
     int clone_errno;
     clone_pid = local_clone((int (*)(void *))ListerThread, &args);
     clone_errno = errno;
@@ -609,7 +612,7 @@ int ListAllProcessThreads(void *parameter,
 #ifndef PR_SET_PTRACER
 # define PR_SET_PTRACER 0x59616d61
 #endif
-    sys_prctl(PR_SET_PTRACER, clone_pid);
+    sys_prctl(PR_SET_PTRACER, clone_pid, 0, 0, 0);
 
     sys_sigprocmask(SIG_SETMASK, &sig_old, &sig_old);
 
@@ -648,7 +651,7 @@ int ListAllProcessThreads(void *parameter,
   /* Restore the "dumpable" state of the process                             */
 failed:
   if (!dumpable)
-    sys_prctl(PR_SET_DUMPABLE, dumpable);
+    sys_prctl(PR_SET_DUMPABLE, dumpable, 0, 0, 0);
 
   va_end(args.ap);
 

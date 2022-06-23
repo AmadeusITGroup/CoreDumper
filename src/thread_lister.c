@@ -33,6 +33,8 @@
 
 #include <stdio.h>         /* needed for NULL on some powerpc platforms (?!) */
 #include <sys/prctl.h>
+#include <sys/types.h>
+#include <unistd.h>
 #include "thread_lister.h"
 #include "linuxthreads.h"
 /* Include other thread listers here that define THREADS macro

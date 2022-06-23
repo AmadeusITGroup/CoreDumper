@@ -433,7 +433,7 @@ static void CheckWithGDB(FILE *input, FILE *output, const char *filename,
   struct sigaction sa;
 
 #if defined(__i386__) || defined(__x86_64) || defined(__ARM_ARCH_3__) || \
-    defined(__mips__)
+    defined(__aarch64__) || defined(__mips__)
   /* If we have a platform-specific FRAME() macro, we expect the stack trace
    * to be unrolled all the way to WriteCoreDump().
    */
@@ -775,6 +775,7 @@ void TestCoreDump() {
     unlink(core_test);
 
     /* Check whether limits work correctly                                   */
+    puts("Check whether limits work correctly");
     rc = (loop ? MyWriteCoreDumpLimited : WriteCoreDumpLimited)(
            core_test, 0);
     assert(!rc);
