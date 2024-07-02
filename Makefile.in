@@ -149,7 +149,8 @@ libcoredumper_la_LIBADD =
 am__dirstamp = $(am__leading_dot)dirstamp
 am__objects_1 =
 am_libcoredumper_la_OBJECTS = src/coredumper.lo src/thread_lister.lo \
-	src/elfcore.lo src/linuxthreads.lo $(am__objects_1)
+	src/elfcore.lo src/linuxthreads.lo src/corepoint.lo \
+	$(am__objects_1)
 libcoredumper_la_OBJECTS = $(am_libcoredumper_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -184,7 +185,8 @@ DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)/src
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__maybe_remake_depfiles = depfiles
 am__depfiles_remade = src/$(DEPDIR)/coredumper.Plo \
-	src/$(DEPDIR)/coredumper_unittest.Po src/$(DEPDIR)/elfcore.Plo \
+	src/$(DEPDIR)/coredumper_unittest.Po \
+	src/$(DEPDIR)/corepoint.Plo src/$(DEPDIR)/elfcore.Plo \
 	src/$(DEPDIR)/linux_syscall_support_unittest.Po \
 	src/$(DEPDIR)/linuxthreads.Plo src/$(DEPDIR)/thread_lister.Plo
 am__mv = mv -f
@@ -603,12 +605,13 @@ man3_MANS = man/GetCoreDump.man man/WriteCoreDump.man \
 
 LIBCOREDUMPER_INCLUDES = src/google/coredumper.h src/elfcore.h \
                          src/linux_syscall_support.h src/linuxthreads.h \
-                         src/thread_lister.h
+                         src/thread_lister.h src/corepoint.h
 
 libcoredumper_la_SOURCES = src/coredumper.c \
                            src/thread_lister.c \
                            src/elfcore.c \
                            src/linuxthreads.c \
+                           src/corepoint.c \
                            $(LIBCOREDUMPER_INCLUDES)
 
 libcoredumper_la_LDFLAGS = -export-symbols $(top_srcdir)/src/libcoredumper.sym \
@@ -732,6 +735,7 @@ src/thread_lister.lo: src/$(am__dirstamp) \
 	src/$(DEPDIR)/$(am__dirstamp)
 src/elfcore.lo: src/$(am__dirstamp) src/$(DEPDIR)/$(am__dirstamp)
 src/linuxthreads.lo: src/$(am__dirstamp) src/$(DEPDIR)/$(am__dirstamp)
+src/corepoint.lo: src/$(am__dirstamp) src/$(DEPDIR)/$(am__dirstamp)
 
 libcoredumper.la: $(libcoredumper_la_OBJECTS) $(libcoredumper_la_DEPENDENCIES) $(EXTRA_libcoredumper_la_DEPENDENCIES) 
 	$(AM_V_CCLD)$(libcoredumper_la_LINK) -rpath $(libdir) $(libcoredumper_la_OBJECTS) $(libcoredumper_la_LIBADD) $(LIBS)
@@ -758,6 +762,7 @@ distclean-compile:
 
 @AMDEP_TRUE@@am__include@ @am__quote@src/$(DEPDIR)/coredumper.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@src/$(DEPDIR)/coredumper_unittest.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@src/$(DEPDIR)/corepoint.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@src/$(DEPDIR)/elfcore.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@src/$(DEPDIR)/linux_syscall_support_unittest.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@src/$(DEPDIR)/linuxthreads.Plo@am__quote@ # am--include-marker
@@ -1365,6 +1370,7 @@ distclean: distclean-am
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
 		-rm -f src/$(DEPDIR)/coredumper.Plo
 	-rm -f src/$(DEPDIR)/coredumper_unittest.Po
+	-rm -f src/$(DEPDIR)/corepoint.Plo
 	-rm -f src/$(DEPDIR)/elfcore.Plo
 	-rm -f src/$(DEPDIR)/linux_syscall_support_unittest.Po
 	-rm -f src/$(DEPDIR)/linuxthreads.Plo
@@ -1420,6 +1426,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -rf $(top_srcdir)/autom4te.cache
 		-rm -f src/$(DEPDIR)/coredumper.Plo
 	-rm -f src/$(DEPDIR)/coredumper_unittest.Po
+	-rm -f src/$(DEPDIR)/corepoint.Plo
 	-rm -f src/$(DEPDIR)/elfcore.Plo
 	-rm -f src/$(DEPDIR)/linux_syscall_support_unittest.Po
 	-rm -f src/$(DEPDIR)/linuxthreads.Plo
